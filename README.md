@@ -1,39 +1,60 @@
 # Confidential Agent Commerce
 
-Two autonomous agents transact on Stellar testnet. The amount settles
-**encrypted on-chain** — the seller confirms payment by decrypting it, a
-registered auditor can always read it, and everyone else sees nothing.
+**Two AI agents buy and sell from each other, and the price is encrypted on a
+public blockchain.** Anyone can see that a payment happened. Only the buyer,
+the seller, and a registered auditor can see how much.
 
-**Live: https://confidential-agent-commerce.vercel.app** · [60-second recording of a real run](./demo.webm) (survives testnet resets) — press the button
-and a brand-new payment is negotiated, proven (zero-knowledge, in your
-browser), and settled on testnet while you watch. Every run is a real
-transaction with a random price that never appears on-chain.
+**[Try it live](https://confidential-agent-commerce.vercel.app)** — press one
+button and watch a real payment happen on Stellar testnet in about 20 seconds.
+([recording](./demo.webm), in case testnet is reset.)
 
-## What actually happens
+## Why this is hard
 
-1. **MOMO** (seller) quotes a price for a data product.
-2. **PIP** (buyer) generates an UltraHonk zero-knowledge proof and submits a
-   `confidential_transfer` to OpenZeppelin's Confidential Token contract.
-   Open the transaction on any explorer: there is no amount — only
-   elliptic-curve commitments.
-3. MOMO rebuilds its balance from public chain events and **decrypts** its
-   receiving balance with a key derived from one signature. If the decrypted
-   delta matches the invoice, it ships the goods, signed.
-4. PIP verifies the signature, and its own reconstructed state is checked
-   **byte-for-byte against the commitments the chain holds** — an RPC or
-   archive can lie; the chain's own points cannot.
+A public blockchain is public. If two businesses settle on-chain, their
+competitors read every price they pay. That is why serious commerce doesn't
+run on transparent ledgers — and why hiding the amount *completely* isn't the
+answer either: a regulator that cannot audit is a regulator that says no.
 
-One payment, four views:
+This does both. The amount is invisible to the public **and** always readable
+by a designated auditor — enforced by the cryptography, not by a promise. The
+proof literally will not verify unless the auditor's copy is included.
 
-| observer | sees |
+## One payment, four different views
+
+| who | sees |
 |---|---|
-| anyone (explorer, rival agent) | that a transfer happened, between which addresses — never the amount |
-| seller | the exact amount, decrypted with its own derived key |
-| buyer | its change, chain-verified |
-| the registered auditor | the amount — the proof refuses to verify without the auditor's ciphertext |
+| the public (explorers, rivals) | a payment happened, and between whom — **never how much** |
+| the seller | the exact amount, decrypted with its own key |
+| the buyer | its own change, re-checked against the chain |
+| the registered auditor | the amount, always — the proof is invalid without it |
 
-Full mechanics (commitments, key derivation, what the proof proves, why the
-auditor is not optional): **https://confidential-agent-commerce.vercel.app/how/**
+## What happens when you press the button
+
+1. **Pip** (buyer) compares quotes from two merchant agents, **Momo** and
+   **Kiki**, and picks one.
+2. They negotiate a price — neither side sees the other's number — or Pip pays
+   a Machine Payments Protocol 402 challenge.
+3. Pip builds an **UltraHonk zero-knowledge proof in your browser** and submits
+   a `confidential_transfer` to OpenZeppelin's Confidential Token contract.
+   *Open that transaction in any explorer: there is no amount, only
+   elliptic-curve commitments.*
+4. The merchant rebuilds its balance from public chain events, **decrypts** its
+   own receiving balance, and ships the goods only if the decrypted amount
+   matches the invoice — it trusts arithmetic, not Pip's word.
+5. Pip verifies the merchant's signature and re-derives its own state
+   **byte-for-byte against the commitments the chain holds**, so a lying
+   archive or event feed is caught.
+
+Full mechanics — commitments, key derivation, what the proof actually proves,
+and why the auditor is not optional:
+**[how it works](https://confidential-agent-commerce.vercel.app/how/)**
+
+> **Status: testnet, alpha.** The demo's keys are published on purpose, so
+> anyone can decrypt *this demo's* amounts — that is a property of the demo,
+> not of the protocol. Confidentiality covers the **amount**; sender, recipient
+> and timing stay public. The confidential key is derived deterministically
+> from your Stellar key, so it cannot be rotated and offers no forward secrecy.
+> OpenZeppelin's Confidential Tokens are testnet-only today.
 
 ## The market: two merchants, a buyer that shops
 

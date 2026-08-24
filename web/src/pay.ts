@@ -184,6 +184,28 @@ async function run(tick = 0, afterHeader?: () => void) {
   ($("exports") as HTMLElement).style.visibility = "hidden";
 
   try {
+    // The run emits ~80 narration lines; the stage strip is the spine that tells
+// you WHERE you are while they stream past. Cheap, and reset per run.
+const STAGES = ["shop", "deal", "prove", "settle", "deliver"] as const;
+function stage(name: (typeof STAGES)[number] | null) {
+  const els = document.querySelectorAll<HTMLElement>(".stages li");
+  if (!name) {
+    for (const el of els) { el.removeAttribute("data-on"); el.removeAttribute("data-done"); }
+    return;
+  }
+  const at = STAGES.indexOf(name);
+  for (const el of els) {
+    const i = STAGES.indexOf((el.dataset.stage ?? "") as (typeof STAGES)[number]);
+    el.removeAttribute("data-on"); el.removeAttribute("data-done");
+    if (i < at) el.setAttribute("data-done", "1");
+    else if (i === at) el.setAttribute("data-on", "1");
+  }
+}
+function stagesDone() {
+  for (const el of document.querySelectorAll<HTMLElement>(".stages li")) {
+    el.removeAttribute("data-on"); el.setAttribute("data-done", "1");
+  }
+}
     status("loading client…");
     const [{ Keypair, Address, nativeToScVal, xdr }, core, chain, circuit] = await Promise.all([
       import("@stellar/stellar-sdk"),
@@ -260,7 +282,7 @@ async function run(tick = 0, afterHeader?: () => void) {
     const style = (($("style") as HTMLSelectElement | null)?.value ?? "haggle") as "haggle" | "take" | "stingy";
 
     // ── Pip shops: reads the market, picks a merchant by its own shopping policy ──
-    status("Pip reads the market");
+    stage(null); stage("shop"); status("Pip reads the market");
     let chosen: any = null;
     try {
       const mk = await fetch(`/api/market?cfg_momo=${merchantCfg("momo")}&cfg_kiki=${merchantCfg("kiki")}`).then((r) => r.json());
@@ -274,7 +296,7 @@ async function run(tick = 0, afterHeader?: () => void) {
       if (capped.length) sys(`Pip's notebook: ${capped.map((r) => `${r.name} has served Pip ${myPaidLastHour(r.id)} of ${r.terms.maxPaymentsPerCustomerPerHour} this hour`).join("; ")}. Pip will not pay a shop past the terms it read.`);
       if (!rows.length) {
         sys(`every merchant has served Pip its hourly maximum. Paying again would be declined at the till and refunded, so Pip sits this round out until the hour rolls.`);
-        status("sitting out"); return;
+        stage(null); status("sitting out"); return;
       }
       const shopPolicy = (($("shop") as HTMLSelectElement | null)?.value ?? "cheapest") as "cheapest" | "trusted" | "momo" | "kiki";
       const trusted = rows.filter((r) => r.trackRecord.payments >= 3);
@@ -324,7 +346,7 @@ async function run(tick = 0, afterHeader?: () => void) {
       if (amt > budget) {
         bubble("pip", `${xl(amt)} is over my budget. Leaving it.`);
         sys(`no deal: the MPP challenge (${xl(amt)} XLM) is above Pip's budget (${xl(budget)} XLM). Nothing was paid, nothing hit the chain. Raise the budget or switch Pip to "negotiate", where it can counter.`);
-        status("no deal"); return;
+        stage(null); status("no deal"); return;
       }
       agreed = amt;
       bubble("pip", `${xl(amt)} works. Paying the challenge confidentially.`);
@@ -387,11 +409,11 @@ async function run(tick = 0, afterHeader?: () => void) {
     if (invoiceDoc?.invoiceId) sys(`${chosen.name} issued invoice ${String(invoiceDoc.invoiceId).slice(0, 12)}… for ${priceXlm} XLM to Pip (signed, expires in 10 min). Pip will bind the payment to it by attesting {invoiceId, tx} with its own key.`);
     if (terms && Number(priceXlm) < terms.terms.minTicketXlm) {
       sys(`Pip: agreed price ${priceXlm} XLM is under ${chosen.name}'s minimum ticket ${terms.terms.minTicketXlm} XLM per its own terms; paying would be refused at the till. Walking.`);
-      status("no deal (terms)"); return;
+      stage(null); status("no deal (terms)"); return;
     }
 
     // ── funds check + top-up if needed (real transactions, no proof required) ──
-    status("checking balance…");
+    stage("deal"); status("checking balance…");
     let pipEngine = await rebuild(pip);
     let spendable = pipEngine.state().spendable;
     if (spendable.v < price + 2n * STROOP) {
@@ -408,7 +430,7 @@ async function run(tick = 0, afterHeader?: () => void) {
 
     // ── Pip pays: proof in this tab, settle on testnet ──
     t = typing("pip", "generating zero-knowledge proof in this tab…");
-    status("proving…");
+    stage("prove"); status("proving…");
     const kAud = await client.auditorKey(SESSION.auditorId);
     const t0 = performance.now();
     const witness = buildTransferWitness({
@@ -425,7 +447,7 @@ async function run(tick = 0, afterHeader?: () => void) {
     sys(`proof generated in this browser in ${proveSecs}s`, "good");
 
     t = typing("pip", "submitting to testnet…");
-    status("submitting…");
+    stage("settle"); status("submitting…");
     const pay = await client.invoke(SESSION.contracts.token, "confidential_transfer",
       [addr(pip.address), addr(seller.address), bytesVal(payload)], pipSigner);
     t();
@@ -501,6 +523,7 @@ async function run(tick = 0, afterHeader?: () => void) {
       (await import("@stellar/stellar-sdk")).hash(Buffer.from(JSON.stringify(served.brief))),
       Buffer.from(served.signature, "base64"));
     sys(`${chosen.name} verified the payment by decrypting it (not by trusting Pip), delivered "${served.brief.title}", sha256 ${String(served.sha256).slice(0, 12)}…, signature ${sigOk ? "verified" : "FAILED"}`, sigOk ? "good" : "");
+    stage("deliver");
     bubble("momo", `Delivered: "${served.brief.title}".`);
 
     // chain verification of the buyer's own state
@@ -510,6 +533,7 @@ async function run(tick = 0, afterHeader?: () => void) {
       spendableC: pointToBytes(onchain.spendableBalance),
       receivingC: pointToBytes(onchain.receivingBalance),
     });
+    if (check.ok) stagesDone();
     sys(check.ok ? "buyer state verified byte-for-byte against on-chain commitments" : "verify mismatch", check.ok ? "good" : "");
     await wait(300);
     bubble("pip", "Received. Good doing business.");

@@ -152,12 +152,33 @@
   }
   @media print{ body *{display:none!important} .slipwrap,.slipwrap *{display:block!important} .slip{box-shadow:none;border:none} }
 </style>
+<style>
+.stages{list-style:none;display:flex;gap:6px;margin:14px 0 4px;padding:0;flex-wrap:wrap}
+.stages li{flex:1 1 140px;min-width:132px;padding:8px 10px;border:1px solid var(--line,#2a2a2a);border-radius:8px;
+  font-size:12.5px;line-height:1.35;color:var(--sub,#8a8a8a);background:transparent;transition:border-color .2s,color .2s,background .2s}
+.stages li span{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-right:6px;
+  border-radius:50%;border:1px solid currentColor;font-size:10.5px;font-variant-numeric:tabular-nums}
+.stages li em{display:block;font-style:normal;font-size:11px;opacity:.72;margin-top:3px}
+.stages li[data-on]{color:var(--ink,#eaeaea);border-color:currentColor}
+.stages li[data-done]{color:var(--good,#5bbf8a);border-color:color-mix(in srgb,currentColor 45%,transparent)}
+.stages li[data-done] span::after{content:"✓";font-size:10px}
+.stages li[data-done] span{font-size:0}
+@media (prefers-reduced-motion:reduce){.stages li{transition:none}}
+</style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Confidential Agent Commerce</h1>
-    <p class="sub">Two merchant agents, Momo and Kiki, run as live services with their own prices and signed terms. Pip is a buyer agent with a budget you set: it shops the market, negotiates for real (neither side sees the other's number) or pays a Machine Payments Protocol challenge, and the price settles encrypted on Stellar testnet. The merchant confirms payment by decrypting it, a registered auditor can always read it, everyone else sees nothing. Let it run and Pip keeps trading on its own while you change the rules under it.</p>
+    <p class="sub"><b>Two AI agents buy and sell from each other — and the price is encrypted on the public chain.</b> Everyone can see that a payment happened. Only the seller, the buyer, and a registered auditor can see how much. Every run below is a real transaction on Stellar testnet, about 20 seconds.</p>
+
+    <ol class="stages" id="stages" aria-label="what happens in a run">
+      <li data-stage="shop"><span>1</span> Pip shops<em>compares two merchants' quotes</em></li>
+      <li data-stage="deal"><span>2</span> They agree a price<em>neither side sees the other's number</em></li>
+      <li data-stage="prove"><span>3</span> Pip proves it<em>zero-knowledge proof, in your browser</em></li>
+      <li data-stage="settle"><span>4</span> It settles<em>on-chain — with no amount visible</em></li>
+      <li data-stage="deliver"><span>5</span> Momo decrypts &amp; delivers<em>and Pip re-checks against the chain</em></li>
+    </ol>
     <p class="sub" style="font-size:12px;margin-top:8px">Demo keys are published on purpose (testnet, worthless): anyone can decrypt this demo's own amounts. The protocol hides amounts from anyone without keys.</p>
     <div class="runbar">
       <div class="selwrap"><select id="denom" aria-label="currency"><option value="xlm">XLM</option><option value="usd">USD, oracle to XLM</option></select></div>
