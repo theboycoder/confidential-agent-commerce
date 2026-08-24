@@ -14,6 +14,20 @@ import type { MerchantProfile } from "../merchants.js";
 // mppx turns any non-PaymentError thrown from verify() into a bare "Verification Failed"; keep the reason.
 const fail = (reason: string) => new Errors.VerificationFailedError({ reason });
 /** tx hash -> XLM the merchant decrypted for it (per instance; lets the resource handler tell the buyer what was read). */
+/**
+ * The HMAC key that authenticates every payment challenge. There is NO
+ * fallback on purpose: a literal here would be a public signing key (it was),
+ * letting anyone forge a valid challenge for any amount. Fail loudly instead.
+ */
+function mppSecret(): string {
+	const k = process.env.MPP_SECRET_KEY;
+	if (!k || k.length < 16)
+		throw new Error(
+			"MPP_SECRET_KEY is unset (or too short) — refusing to sign payment challenges with a guessable key",
+		);
+	return k;
+}
+
 export const decryptedFor = new Map<string, number>();
 
 export function confidentialChargeServer(M: MerchantProfile) {
@@ -65,7 +79,7 @@ export function confidentialChargeServer(M: MerchantProfile) {
 
 export function mppFor(M: MerchantProfile) {
   return Mppx.create({
-    secretKey: process.env.MPP_SECRET_KEY ?? "confidential-agent-commerce-testnet-" + M.id,
+    secretKey: mppSecret() + M.id,
     methods: [confidentialChargeServer(M)],
   });
 }

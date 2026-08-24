@@ -14,6 +14,18 @@ jobs:
         with: { node-version: 22 }
       - run: cd web && npm ci && node scripts-refund.mjs && node scripts-checkpoint.mjs
       - run: |
-          git config user.name "momo-checkpoint" && git config user.email "bot@users.noreply.github.com"
+          # The author matters: Vercel's git-author gate SKIPS builds for an
+          # unrecognised committer, so a *@users.noreply bot author silently
+          # produced fresh commits that never deployed — production sat 7 days
+          # behind a green pipeline. Commit as the repo owner so the build runs.
+          git config user.name "momo-checkpoint" && git config user.email "shubhbrar25@gmail.com"
           git add web/public/checkpoint.json web/public/refunds.json
           git diff --cached --quiet || git commit -m "checkpoint: refresh Momo state (auto)" && git push
+
+      - name: Nudge the deploy (belt and braces)
+        # Set VERCEL_DEPLOY_HOOK to a Vercel Deploy Hook URL to guarantee a
+        # build even if the author gate ever changes again. No-ops if unset.
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK" >/dev/null && echo "deploy hook fired"; else echo "no VERCEL_DEPLOY_HOOK set — relying on the author gate"; fi

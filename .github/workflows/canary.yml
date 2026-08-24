@@ -1,0 +1,40 @@
+# Hourly liveness canary for the public demo.
+#
+# The demo went 7 days stale behind a green pipeline once: checkpoint commits
+# landed in git but Vercel's git-author gate skipped the builds, so nothing
+# ever said the deployed site was rotting. This watches the deployed thing,
+# not the repo, and opens an issue the moment it degrades.
+name: canary
+on:
+  schedule: [{ cron: "23 * * * *" }]
+  workflow_dispatch:
+permissions: { contents: read, issues: write }
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe the live demo
+        id: probe
+        run: |
+          BODY=$(curl -sS --max-time 30 https://confidential-agent-commerce.vercel.app/api/momo/health || echo '{}')
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://confidential-agent-commerce.vercel.app/api/momo/health || echo 000)
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"; echo "$BODY" >> "$GITHUB_OUTPUT"; echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "HTTP $CODE"; echo "$BODY"
+          [ "$CODE" = "200" ]
+
+      - name: Open an issue when the demo is degraded
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.probe.outputs.code }}
+          BODY: ${{ steps.probe.outputs.body }}
+        run: |
+          TITLE="canary: live demo is degraded (HTTP $CODE)"
+          # One open issue at a time — a daily re-alert is noise, not signal.
+          if gh issue list --state open --search "$TITLE in:title" --json number --jq 'length' | grep -qv '^0$'; then
+            echo "issue already open"; exit 0
+          fi
+          gh issue create --title "$TITLE" \
+            --body "$(printf '`/api/momo/health` returned **HTTP %s**.\n\n```json\n%s\n```\n\nUsual cause: the deployed checkpoint has aged past RPC retention because a build did not run. Check that the latest `checkpoint:` commit actually deployed.\n\n_opened automatically by the canary workflow._' "$CODE" "$BODY")"

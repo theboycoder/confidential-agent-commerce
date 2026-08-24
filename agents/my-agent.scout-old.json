@@ -1,8 +1,0 @@
-{
-  "name": "Scout",
-  "address": "GC26G7DD3KTZQCBCKA3A66ZG5ES5ZSWRQZIPOE2WGXRXK5AWV6HYIQBR",
-  "secret": "SCKA7FOXMD3CXYRFVZLRZWOIGFXFMPCJRFRTDDF3L7TXXO7GEXYE2J4Y",
-  "createdAt": "2026-08-17T01:01:23.698Z",
-  "network": "stellar:testnet",
-  "bornLedger": 4182490
-}

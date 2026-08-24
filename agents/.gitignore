@@ -1,1 +1,4 @@
 my-agent.json
+
+# any agent identity file, including renamed variants
+my-agent*.json
